@@ -3,7 +3,7 @@
 	"displayName": "PowerShell",
 	"version": "0.3.1",
 	"publisher": "ms-vscode",
-	"description": "Develop PowerShell scripts in Visual Studio Code!",	
+	"description": "Develop PowerShell scripts in Visual Studio Code!",
 	"engines": { "vscode": "0.10.x" },
 	"license":"SEE LICENSE IN LICENSE.txt",
 	"homepage": "https://github.com/PowerShell/vscode-powershell/blob/master/README.md",
@@ -12,20 +12,20 @@
 		"Snippets",
 		"Debuggers",
 		"Linters"
-	],	
+	],
 	"icon": "images/PowerShell_icon.png",
 	"galleryBanner": {
 		"color": "#ACD1EC",
 		"theme": "light"
-	},	
+	},
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/PowerShell/vscode-powershell.git"
-	},	
+	},
 	"main": "./out/main",
 	"activationEvents": ["onLanguage:powershell"],
 	"dependencies": {
-		"vscode-languageclient": "0.10.7"
+		"vscode-languageclient": "1.1.2"
 	},
 	"devDependencies": {
 		"vscode": "0.10.6",
@@ -39,7 +39,7 @@
 		"compile": "node ./node_modules/vscode/bin/compile -watch -p ./"
     },
 	"contributes": {
-		"keybindings": [			
+		"keybindings": [
 			{
 				"command": "PowerShell.OnlineHelp",
 				"key": "ctrl+f1",
@@ -56,12 +56,12 @@
 				"when": "editorTextFocus && editorLangId == 'powershell'"
 			}
 		],
-		"commands": [			
+		"commands": [
 			{
 				"command": "PowerShell.ExpandAlias",
 				"title": "Expand Alias",
 				"category": "PowerShell"
-			},		
+			},
 			{
 				"command": "PowerShell.OnlineHelp",
 				"title": "Get online help for command",
@@ -70,7 +70,7 @@
 			{
 				"command": "PowerShell.RunSelection",
 				"title": "Run selection",
-				"category": "PowerShell"	
+				"category": "PowerShell"
 			}
 		],
 		"snippets": [
@@ -78,7 +78,7 @@
 				"language": "powershell",
 				"path": "./snippets/PowerShell.json"
 			}
-		],		
+		],
 		"debuggers": [
 			{
 				"type": "PowerShell",
@@ -104,7 +104,7 @@
 					}
 				]
 			}
-		],		
+		],
 		"configuration": {
 			"type": "object",
 			"title": "PowerShell Configuration",
@@ -113,7 +113,7 @@
 					"type": "boolean",
 					"default": true,
 					"description": "Enables real-time script analysis using PowerShell Script Analyzer."
-				},				
+				},
 				"powershell.developer.editorServicesHostPath": {
 					"type": "string",
 					"default": "../bin/Microsoft.PowerShell.EditorServices.Host.exe",
@@ -123,9 +123,9 @@
 					"type": "boolean",
 					"default": false,
 					"description": "Launches the language service with the /waitForDebugger flag to force it to wait for a .NET debugger to attach before proceeding."
-				}				
+				}
 			}
 		}
 	},
-	"private": true		
+	"private": true
 }
