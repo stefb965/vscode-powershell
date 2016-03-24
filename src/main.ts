@@ -15,6 +15,7 @@ import { registerShowHelpCommand } from './features/ShowOnlineHelp';
 import { registerOpenInISECommand } from './features/OpenInISE';
 import { registerPowerShellFindModuleCommand } from './features/PowerShellFindModule';
 import { registerConsoleCommands } from './features/Console';
+import { registerCodeActionCommands } from './features/CodeActions';
 
 var languageServerClient: LanguageClient = undefined;
 
@@ -120,6 +121,7 @@ function registerFeatures() {
     registerConsoleCommands(languageServerClient);
     registerOpenInISECommand();
     registerPowerShellFindModuleCommand(languageServerClient);
+    registerCodeActionCommands(languageServerClient);
 }
 
 export function deactivate(): void {
