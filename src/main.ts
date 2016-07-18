@@ -93,8 +93,7 @@ export function activate(context: vscode.ExtensionContext): void {
             '-HostName "Visual Studio Code Host" ' +
             '-HostProfileId "Microsoft.VSCode" ' +
             '-HostVersion "' + hostVersion + '" ' +
-            '-BundledModulesPath "' + bundledModulesPath + '" ' +
-            '-WaitForCompletion ';
+            '-BundledModulesPath "' + bundledModulesPath + '" ';
 
         if (settings.developer.editorServicesWaitForDebugger) {
             startArgs += '-WaitForDebugger ';
@@ -142,8 +141,7 @@ export function activate(context: vscode.ExtensionContext): void {
 function startPowerShell(powerShellExePath: string, bundledModulesPath: string, startArgs: string) {
     try
     {
-        let languageServicePipeName = "PSES-VSCode-LanguageService-" + process.env.VSCODE_PID;
-        let debugServicePipeName = "PSES-VSCode-DebugService-" + process.env.VSCODE_PID;
+        let psesSessionFileName = "PSES-VSCode-" + process.env.VSCODE_PID;
 
         let startScriptPath =
             path.resolve(
@@ -157,9 +155,7 @@ function startPowerShell(powerShellExePath: string, bundledModulesPath: string, 
         var powerShellLogName = logging.getLogName("PowerShell");
 
         startArgs +=
-            '-LogPath "' + path.resolve(logBasePath, editorServicesLogName) + '" ' +
-            '-LanguageServicePipeName "' + languageServicePipeName + '" ' +
-            '-DebugServicePipeName "' + debugServicePipeName + '" ';
+            '-LogPath "' + path.resolve(logBasePath, editorServicesLogName) + '" ';
 
         let args = [
             '-NoProfile',
@@ -181,8 +177,20 @@ function startPowerShell(powerShellExePath: string, bundledModulesPath: string, 
             'data',
             (data: Buffer) => {
                 powerShellLogWriter.write("OUTPUT: " + data);
-                if (decoder.write(data).trim() == "PowerShell Editor Services host has started.") {
-                    startLanguageClient(languageServicePipeName);
+                var response = JSON.parse(decoder.write(data).trim());
+
+                if (response["status"] === "started") {
+                    let languageServicePort = response["languageServicePort"];
+                    let debugServicePort = response["debugServicePort"];
+
+                    // Write out the session configuration file
+                    // TODO Need a function for this
+
+                    // Start the language service client
+                    startLanguageClient(languageServicePort);
+                }
+                else {
+                    // TODO: Handle other response cases
                 }
             });
 
@@ -193,6 +201,7 @@ function startPowerShell(powerShellExePath: string, bundledModulesPath: string, 
                 powerShellLogWriter.write("ERROR: " + data);
             });
 
+        powe
         powerShellProcess.on(
             'close',
             (exitCode) => {
@@ -217,17 +226,17 @@ function startPowerShell(powerShellExePath: string, bundledModulesPath: string, 
     }
 }
 
-function startLanguageClient(pipeName: string) {
+function startLanguageClient(port: number) {
     try
     {
         let connectFunc = () => {
             return new Promise<StreamInfo>(
                 (resolve, reject) => {
-                    var socket = net.connect("\\\\.\\pipe\\" + pipeName);
+                    var socket = net.connect(port);
                     socket.on(
                         'connect',
                         function() {
-                            console.log("Pipe connected!");
+                            console.log("Socket connected!");
                             resolve({writer: socket, reader: socket})
                         });
                 });
