@@ -10,6 +10,7 @@ import cp = require('child_process');
 import path = require('path');
 import utils = require('./utils');
 import vscode = require('vscode');
+import status = require('./status');
 import logging = require('./logging');
 import settingsManager = require('./settings');
 import { StringDecoder } from 'string_decoder';
@@ -170,6 +171,10 @@ export function activate(context: vscode.ExtensionContext): void {
 function startPowerShell(powerShellExePath: string, bundledModulesPath: string, startArgs: string) {
     try
     {
+        status.setExtensionStatus(
+            "Starting PowerShell...",
+            status.ExtensionStatus.Initializing);
+
         let startScriptPath =
             path.resolve(
                 __dirname,
@@ -254,6 +259,8 @@ function startPowerShell(powerShellExePath: string, bundledModulesPath: string, 
             "\r\n    bundledModulesPath: " + bundledModulesPath +
             "\r\n    args: " + startScriptPath + ' ' + startArgs + "\r\n\r\n");
 
+        //vscode.window.setStatusBarMessage("$(alert) PowerShell Editor Services could not be initialized, language and debugging features are disabled.", 10000);
+
         // TODO: Set timeout for response from powershell.exe
     }
     catch (e)
@@ -297,8 +304,20 @@ function startLanguageClient(port: number, logWriter: fs.WriteStream) {
                 clientOptions);
 
         languageServerClient.onReady().then(
-            () => registerFeatures(),
-            (reason) => vscode.window.showErrorMessage("Could not start language service: " + reason));
+            () => {
+                status.setExtensionStatus(
+                    "PowerShell Editor Services running",
+                    status.ExtensionStatus.Running);
+
+                registerFeatures()
+            },
+            (reason) => {
+                vscode.window.showErrorMessage("Could not start language service: " + reason)
+
+                status.setExtensionStatus(
+                    "PowerShell Editor Services failed",
+                    status.ExtensionStatus.Failed);
+            });
 
         languageServerClient.start();
     }
@@ -306,6 +325,10 @@ function startLanguageClient(port: number, logWriter: fs.WriteStream) {
     {
         vscode.window.showErrorMessage(
             "The language service could not be started: " + e);
+
+        status.setExtensionStatus(
+            "PowerShell Editor Services failed",
+            status.ExtensionStatus.Failed);
     }
 }
 
