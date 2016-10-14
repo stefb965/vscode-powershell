@@ -25,12 +25,13 @@ import net = require('net');
 
 // NOTE: We will need to find a better way to deal with the required
 //       PS Editor Services version...
-var requiredEditorServicesVersion = "0.7.2";
+var requiredEditorServicesVersion = "0.7.9";
 
 var powerShellProcess: cp.ChildProcess = undefined;
 var languageServerClient: LanguageClient = undefined;
 var PowerShellLanguageId = 'powershell';
 var powerShellLogWriter: fs.WriteStream = undefined;
+var consoleTerminal: vscode.Terminal = undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
 
@@ -73,6 +74,7 @@ export function activate(context: vscode.ExtensionContext): void {
             }
         });
 
+
     // Get the current version of this extension
     var hostVersion =
         vscode
@@ -87,17 +89,17 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     var startArgs =
-        '-EditorServicesVersion "' + requiredEditorServicesVersion + '" ' +
-        '-HostName "Visual Studio Code Host" ' +
-        '-HostProfileId "Microsoft.VSCode" ' +
-        '-HostVersion "' + hostVersion + '" ' +
-        '-BundledModulesPath "' + bundledModulesPath + '" ';
+        "-EditorServicesVersion '" + requiredEditorServicesVersion + "' " +
+        "-HostName 'Visual Studio Code Host' " +
+        "-HostProfileId 'Microsoft.VSCode' " +
+        "-HostVersion '" + hostVersion + "' " +
+        "-BundledModulesPath '" + bundledModulesPath + "' ";
 
     if (settings.developer.editorServicesWaitForDebugger) {
         startArgs += '-WaitForDebugger ';
     }
     if (settings.developer.editorServicesLogLevel) {
-        startArgs += '-LogLevel "' + settings.developer.editorServicesLogLevel + '" '
+        startArgs += "-LogLevel '" + settings.developer.editorServicesLogLevel + "' "
     }
 
     // Find the path to powershell.exe based on the current platform
@@ -182,77 +184,99 @@ function startPowerShell(powerShellExePath: string, bundledModulesPath: string, 
         var powerShellLogName = logging.getLogName("PowerShell");
 
         startArgs +=
-            '-LogPath "' + path.resolve(logBasePath, editorServicesLogName) + '" ';
+            "-LogPath '" + path.resolve(logBasePath, editorServicesLogName) + "' " +
+            "-SessionDetailsPath '" + utils.getSessionFilePath() + "' ";
 
-        let args = [
-            '-NoProfile',
-            '-NonInteractive'
-        ]
+        var batchString = '@ "' + powerShellExePath + '" -NoProfile -NoExit ';
 
         // Only add ExecutionPolicy param on Windows
         if (os.platform() == "win32") {
-            args.push('-ExecutionPolicy');
-            args.push('Unrestricted');
+            batchString += "-ExecutionPolicy Unrestricted "
         }
 
         // Add the Start-EditorServices.ps1 invocation arguments
-        args.push('-Command')
-        args.push('& "' + startScriptPath + '" ' + startArgs)
+        batchString += "-Command \"& '" + startScriptPath + "' " + startArgs + '"'
+
+        var startupScriptPath = path.resolve(__dirname, "../scripts", "start.bat");
+
+        fs.writeFileSync(startupScriptPath, batchString);
+
+        // Make sure no old session file exists
+        utils.deleteSessionFile();
+
+        consoleTerminal =
+            vscode.window.createTerminal(
+                "PowerShell Interactive Console",
+                startupScriptPath);
+
+        consoleTerminal.show();
 
         // Launch PowerShell as child process
-        powerShellProcess = cp.spawn(powerShellExePath, args);
+        //powerShellProcess = cp.spawn(powerShellExePath, args);
 
         // Open a log file to be used for PowerShell.exe output
         powerShellLogWriter =
             fs.createWriteStream(
                 path.resolve(logBasePath, powerShellLogName))
 
-        var decoder = new StringDecoder('utf8');
-        powerShellProcess.stdout.on(
-            'data',
-            (data: Buffer) => {
-                powerShellLogWriter.write("OUTPUT: " + data);
-                var response = JSON.parse(decoder.write(data).trim());
-
-                if (response["status"] === "started") {
-                    let sessionDetails: utils.EditorServicesSessionDetails = response;
-
-                    // Write out the session configuration file
-                    utils.writeSessionFile(sessionDetails);
-
+        // Start the language client
+        utils.waitForSessionFile(
+            (sessionDetails, error) => {
+                if (sessionDetails) {
                     // Start the language service client
                     startLanguageClient(sessionDetails.languageServicePort, powerShellLogWriter);
                 }
                 else {
-                    // TODO: Handle other response cases
+                    vscode.window.showErrorMessage("Could not start language server: " + error);
                 }
             });
 
-        powerShellProcess.stderr.on(
-            'data',
-            (data) => {
-                console.log("powershell.exe - ERROR: " + data);
-                powerShellLogWriter.write("ERROR: " + data);
-            });
+        // var decoder = new StringDecoder('utf8');
+        // powerShellProcess.stdout.on(
+        //     'data',
+        //     (data: Buffer) => {
+        //         powerShellLogWriter.write("OUTPUT: " + data);
+        //         var response = JSON.parse(decoder.write(data).trim());
 
-        powerShellProcess.on(
-            'close',
-            (exitCode) => {
-                console.log("powershell.exe terminated with exit code: " + exitCode);
-                powerShellLogWriter.write("\r\npowershell.exe terminated with exit code: " + exitCode + "\r\n");
+        //         if (response["status"] === "started") {
+        //             let sessionDetails: utils.EditorServicesSessionDetails = response;
 
-                if (languageServerClient != undefined) {
-                    languageServerClient.stop();
-                }
-            });
+        //             // Write out the session configuration file
+        //             utils.writeSessionFile(sessionDetails);
 
-        console.log("powershell.exe started, pid: " + powerShellProcess.pid + ", exe: " + powerShellExePath);
-        powerShellLogWriter.write(
-            "powershell.exe started --" +
-            "\r\n    pid: " + powerShellProcess.pid +
-            "\r\n    exe: " + powerShellExePath +
-            "\r\n    bundledModulesPath: " + bundledModulesPath +
-            "\r\n    args: " + startScriptPath + ' ' + startArgs + "\r\n\r\n");
+        //             // Start the language service client
+        //             startLanguageClient(sessionDetails.languageServicePort, powerShellLogWriter);
+        //         }
+        //         else {
+        //             // TODO: Handle other response cases
+        //         }
+        //     });
+
+        // powerShellProcess.stderr.on(
+        //     'data',
+        //     (data) => {
+        //         console.log("powershell.exe - ERROR: " + data);
+        //         powerShellLogWriter.write("ERROR: " + data);
+        //     });
+
+        // powerShellProcess.on(
+        //     'close',
+        //     (exitCode) => {
+        //         console.log("powershell.exe terminated with exit code: " + exitCode);
+        //         powerShellLogWriter.write("\r\npowershell.exe terminated with exit code: " + exitCode + "\r\n");
+
+        //         if (languageServerClient != undefined) {
+        //             languageServerClient.stop();
+        //         }
+        //     });
+
+        // console.log("powershell.exe started, pid: " + powerShellProcess.pid + ", exe: " + powerShellExePath);
+        // powerShellLogWriter.write(
+        //     "powershell.exe started --" +
+        //     "\r\n    pid: " + powerShellProcess.pid +
+        //     "\r\n    exe: " + powerShellExePath +
+        //     "\r\n    bundledModulesPath: " + bundledModulesPath +
+        //     "\r\n    args: " + startScriptPath + ' ' + startArgs + "\r\n\r\n");
 
         // TODO: Set timeout for response from powershell.exe
     }
@@ -313,7 +337,7 @@ function registerFeatures() {
     // Register other features
     registerExpandAliasCommand(languageServerClient);
     registerShowHelpCommand(languageServerClient);
-    registerConsoleCommands(languageServerClient);
+    registerConsoleCommands(consoleTerminal, languageServerClient);
     registerOpenInISECommand();
     registerPowerShellFindModuleCommand(languageServerClient);
     registerExtensionCommands(languageServerClient);

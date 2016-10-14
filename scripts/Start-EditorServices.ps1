@@ -41,6 +41,11 @@ param(
     [string]
     $BundledModulesPath,
 
+	[Parameter(Mandatory=$true)]
+	[ValidateNotNullOrEmpty()]
+	[string]
+	$SessionDetailsPath,
+
     [ValidateNotNullOrEmpty()]
     $LogPath,
 
@@ -56,6 +61,12 @@ param(
 
 # Are we running in PowerShell 5 or later?
 $isPS5orLater = $PSVersionTable.PSVersion.Major -ge 5
+
+# If PSReadline is present in the session, remove it so that runspace
+# management is easier
+if ((Get-Module PSReadline).Count -ne 0) {
+    Remove-Module PSReadline
+}
 
 # This variable will be assigned later to contain information about
 # what happened while attempting to launch the PowerShell Editor
@@ -94,7 +105,6 @@ function Test-PortAvailability($PortNumber) {
         $tcpListener = New-Object System.Net.Sockets.TcpListener @($ipAddress, $portNumber)
         $tcpListener.Start();
         $tcpListener.Stop();
-
     }
     catch [System.Net.Sockets.SocketException] {
         # Check the SocketErrorCode to see if it's the expected exception
@@ -161,8 +171,9 @@ else {
 $languageServicePort = Get-AvailablePort
 $debugServicePort = Get-AvailablePort
 
+# Create the Editor Services host
 $editorServicesHost =
-    Start-EditorServicesHost `
+    New-EditorServicesHost `
         -HostName $HostName `
         -HostProfileId $HostProfileId `
         -HostVersion $HostVersion `
@@ -170,24 +181,44 @@ $editorServicesHost =
         -LogLevel $LogLevel `
         -LanguageServicePort $languageServicePort `
         -DebugServicePort $debugServicePort `
-        -BundledModulesPath $BundledModulesPath `
-        -WaitForDebugger:$WaitForDebugger.IsPresent
 
-# TODO: Verify that the service is started
+$sessionInfo = @{
+	status = "started";
+	channel = "tcp";
+	languageServicePort = $languageServicePort;
+	debugServicePort = $debugServicePort;
+	sessionDetailsPath = $SessionDetailsPath;
+}
 
-$resultDetails = @{
-    "status" = "started";
-    "channel" = "tcp";
-    "languageServicePort" = $languageServicePort;
-    "debugServicePort" = $debugServicePort;
-};
+# Subscribe to the 'Initialized' event so we can write out session details
+# once the host has fully initialized
+Register-ObjectEvent $editorServicesHost -EventName Initialized -MessageData $sessionInfo -Action {
 
-# Notify the client that the services have started
-Write-Output (ConvertTo-Json -InputObject $resultDetails -Compress)
+	# Store the session details as JSON in the specified path
+	$sessionInfo = $event.MessageData
+	$sessionDetailsPath = $sessionInfo.sessionDetailsPath
+	$sessionInfo.Remove("sessionDetailsPath")  # This key doesn't need to be in the session details
+
+    # Since this handler is running in a job, make sure to expose any error that gets
+    # thrown when writing the session details file
+    try {
+        # TODO: This doesn't seem to be throwing errors reliably...
+        ConvertTo-Json -InputObject $sessionInfo -Compress | Set-Content -Force -Path "$sessionDetailsPath" -ErrorAction Stop
+    }
+    catch {
+        Write-Error -Message "Failed to write session details file to path $sessionDetailsPath" -Exception $_
+    }
+} | Out-Null
+
+# Start the host
+$nonAwaitedTask = $editorServicesHost.Start($WaitForDebugger)
 
 try {
+
+	# TODO: What do we do with this block?
+
     # Wait for the host to complete execution before exiting
-    $editorServicesHost.WaitForCompletion()
+    #$editorServicesHost.WaitForCompletion()
 }
 catch [System.Exception] {
     $e = $_.Exception; #.InnerException;

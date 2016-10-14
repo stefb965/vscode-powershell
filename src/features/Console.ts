@@ -138,7 +138,7 @@ function onInputEntered(responseText: string): ShowInputPromptResponseBody {
     }
 }
 
-export function registerConsoleCommands(client: LanguageClient): void {
+export function registerConsoleCommands(terminal: vscode.Terminal, client: LanguageClient): void {
 
     vscode.commands.registerCommand('PowerShell.RunSelection', () => {
         var editor = vscode.window.activeTextEditor;
@@ -154,9 +154,17 @@ export function registerConsoleCommands(client: LanguageClient): void {
             selectionRange = editor.document.lineAt(editor.selection.start.line).range;
         }
 
-        client.sendRequest(EvaluateRequest.type, {
-            expression: editor.document.getText(selectionRange)
-        });
+        var textToSend = editor.document.getText(selectionRange).trim();
+        terminal.sendText(textToSend, true);
+
+        // Does the text end with a curly brace?  Those need an extra newline
+        if (textToSend.endsWith("}") && !selectionRange.isSingleLine) {
+            terminal.sendText("", true);
+        }
+
+        // client.sendRequest(EvaluateRequest.type, {
+        //     expression: editor.document.getText(selectionRange)
+        // });
     });
 
     var consoleChannel = vscode.window.createOutputChannel("PowerShell Output");

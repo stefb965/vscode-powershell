@@ -57,12 +57,24 @@ export interface EditorServicesSessionDetails {
     languageServicePort: number;
     debugServicePort: number;
 }
+
 export interface ReadSessionFileCallback {
     (details: EditorServicesSessionDetails): void;
 }
 
-let sessionsFolder = path.resolve(__dirname, "sessions/");
+export interface WaitForSessionFileCallback {
+    (details: EditorServicesSessionDetails, error: string): void;
+}
+
+let sessionsFolder = path.resolve(__dirname, "..", "sessions/");
 let sessionFilePath = path.resolve(sessionsFolder, "PSES-VSCode-" + process.env.VSCODE_PID);
+
+// Create the sessions path if it doesn't exist already
+ensurePathExists(sessionsFolder);
+
+export function getSessionFilePath() {
+    return sessionFilePath;
+}
 
 export function writeSessionFile(sessionDetails: EditorServicesSessionDetails) {
     ensurePathExists(sessionsFolder);
@@ -72,13 +84,39 @@ export function writeSessionFile(sessionDetails: EditorServicesSessionDetails) {
     writeStream.close();
 }
 
+export function waitForSessionFile(callback: WaitForSessionFileCallback) {
+
+    function innerTryFunc(remainingTries: number) {
+        if (remainingTries == 0) {
+            callback(undefined, "Timed out waiting for session file to appear.");
+        }
+        else if(!checkIfFileExists(sessionFilePath)) {
+            // Wait a bit and try again
+            setTimeout(function() { innerTryFunc(remainingTries - 1); }, 500);
+        }
+        else {
+            // Session file was found, load and return it
+            callback(readSessionFile(), undefined);
+        }
+    }
+
+    // Since the delay is 500ms, 20 tries gives 10 seconds of time
+    // for the session file to appear
+    innerTryFunc(20);
+}
+
 export function readSessionFile(): EditorServicesSessionDetails {
     let fileContents = fs.readFileSync(sessionFilePath, "utf-8");
     return JSON.parse(fileContents)
 }
 
 export function deleteSessionFile() {
-    fs.unlinkSync(sessionFilePath);
+    try {
+        fs.unlinkSync(sessionFilePath);
+    }
+    catch (e) {
+        // TODO: Be more specific about what we're catching
+    }
 }
 
 export function checkIfFileExists(filePath: string): boolean {

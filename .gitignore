@@ -5,6 +5,7 @@ out/
 node_modules/
 logs/
 modules/*
+sessions/*
 !modules/README.md
 vscode-powershell.zip
 vscps-preview.zip
