@@ -1,24 +1,9 @@
+/*---------------------------------------------------------
+ * Copyright (C) Microsoft Corporation. All rights reserved.
+ *--------------------------------------------------------*/
+
 import vscode = require('vscode');
 import { LanguageClient, RequestType, NotificationType } from 'vscode-languageclient';
-
-export namespace EvaluateRequest {
-    export const type: RequestType<EvaluateRequestArguments, void, void> =
-        { get method() { return 'evaluate'; } };
-}
-
-export interface EvaluateRequestArguments {
-    expression: string;
-}
-
-export namespace OutputNotification {
-    export const type: NotificationType<OutputNotificationBody> =
-        { get method() { return 'output'; } };
-}
-
-export interface OutputNotificationBody {
-    category: string;
-    output: string;
-}
 
 export namespace ShowChoicePromptRequest {
     export const type: RequestType<ShowChoicePromptRequestArgs, ShowChoicePromptResponseBody, string> =
@@ -140,44 +125,15 @@ function onInputEntered(responseText: string): ShowInputPromptResponseBody {
 
 export function registerConsoleCommands(terminal: vscode.Terminal, client: LanguageClient): void {
 
-    vscode.commands.registerCommand('PowerShell.RunSelection', () => {
-        var editor = vscode.window.activeTextEditor;
-        var selectionRange: vscode.Range = undefined;
-
-        if (!editor.selection.isEmpty) {
-            selectionRange =
-                new vscode.Range(
-                    editor.selection.start,
-                    editor.selection.end);
-        }
-        else {
-            selectionRange = editor.document.lineAt(editor.selection.start.line).range;
-        }
-
-        var textToSend = editor.document.getText(selectionRange).trim();
-        terminal.sendText(textToSend, true);
-
-        // Does the text end with a curly brace?  Those need an extra newline
-        if (textToSend.endsWith("}") && !selectionRange.isSingleLine) {
-            terminal.sendText("", true);
-        }
-
-        // client.sendRequest(EvaluateRequest.type, {
-        //     expression: editor.document.getText(selectionRange)
-        // });
-    });
-
-    var consoleChannel = vscode.window.createOutputChannel("PowerShell Output");
-    client.onNotification(OutputNotification.type, (output) => {
-        var outputEditorExist = vscode.window.visibleTextEditors.some((editor) => {
-	           return editor.document.languageId == 'Log'
-        });
-        if (!outputEditorExist)
-            consoleChannel.show(vscode.ViewColumn.Three);
-        consoleChannel.append(output.output);
-    });
-
-    var t: Thenable<ShowChoicePromptResponseBody>;
+    // var consoleChannel = vscode.window.createOutputChannel("PowerShell Output");
+    // client.onNotification(OutputNotification.type, (output) => {
+    //     var outputEditorExist = vscode.window.visibleTextEditors.some((editor) => {
+	//            return editor.document.languageId == 'Log'
+    //     });
+    //     if (!outputEditorExist)
+    //         consoleChannel.show(vscode.ViewColumn.Three);
+    //     consoleChannel.append(output.output);
+    // });
 
     client.onRequest(
         ShowChoicePromptRequest.type,

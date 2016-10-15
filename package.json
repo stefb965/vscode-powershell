@@ -89,6 +89,11 @@
                 "category": "PowerShell"
             },
             {
+                "command": "PowerShell.RestartSession",
+                "title": "Restart PowerShell Session",
+                "category": "PowerShell"
+            },
+            {
                 "command": "PowerShell.OpenInISE",
                 "title": "Open current file in PowerShell ISE",
                 "category": "PowerShell"

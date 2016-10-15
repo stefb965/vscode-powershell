@@ -2,6 +2,8 @@ import fs = require('fs');
 import os = require('os');
 import path = require('path');
 
+export let PowerShellLanguageId = 'powershell';
+
 export function ensurePathExists(targetPath: string) {
     // Ensure that the path exists
     try {
