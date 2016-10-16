@@ -171,6 +171,7 @@ export class SessionManager {
         this.registeredCommands = [
             vscode.commands.registerCommand('PowerShell.RunSelection', () => { this.runSelectionInConsole(); }),
             vscode.commands.registerCommand('PowerShell.RestartSession', () => { this.restartSession(); }),
+            vscode.window.onDidCloseTerminal((terminal) => this.onTerminalClosed(terminal)),
             vscode.commands.registerCommand(this.ShowStatusBarMenuCommandName, () => { this.showStatusMenu(); }),
             vscode.commands.registerCommand('PowerShell.GetSessionPath', () => {
                 return this.getDebugAdapterArgs() })
@@ -334,6 +335,23 @@ export class SessionManager {
     private restartSession() {
         this.stop();
         this.start();
+    }
+
+    private onTerminalClosed(terminal: vscode.Terminal) {
+        if (terminal == this.consoleTerminal) {
+            // Stop the session
+            this.consoleTerminal = undefined;
+            this.stop();
+
+            this.setSessionStatus(
+                "Terminated",
+                SessionStatus.Failed);
+
+            vscode.window.showErrorMessage(
+                "The PowerShell Interactive Console has terminated, would you like to restart it?",
+                "Yes", "No")
+                .then((answer) => { if (answer === "Yes") { this.start(); }});
+        }
     }
 
     private createStatusBarItem() {
