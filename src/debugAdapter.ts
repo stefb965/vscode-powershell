@@ -15,13 +15,12 @@ import { Logger } from './logging';
 // relay between the two transports.
 
 var logBasePath = path.resolve(__dirname, "../logs");
-utils.ensurePathExists(logBasePath);
 
 var debugAdapterLogWriter =
     fs.createWriteStream(
         path.resolve(
             logBasePath,
-            Logger.getLogName("DebugAdapterClient")));
+            "DebugAdapter.log"));
 
 // Pause the stdin buffer until we're connected to the
 // debug server

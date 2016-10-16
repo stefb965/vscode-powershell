@@ -99,6 +99,11 @@
                 "category": "PowerShell"
             },
             {
+                "command": "PowerShell.OpenLogFolder",
+                "title": "Open PowerShell Extension Logs Folder",
+                "category": "PowerShell"
+            },
+            {
                 "command": "PowerShell.OpenInISE",
                 "title": "Open current file in PowerShell ISE",
                 "category": "PowerShell"

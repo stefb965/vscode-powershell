@@ -210,10 +210,10 @@ export class SessionManager {
                     __dirname,
                     '../scripts/Start-EditorServices.ps1');
 
-            var editorServicesLogName = Logger.getLogName("EditorServices");
+            var editorServicesLogPath = this.log.getLogFilePath("EditorServices");
 
             startArgs +=
-                "-LogPath '" + path.resolve(Logger.getLogBasePath(), editorServicesLogName) + "' " +
+                "-LogPath '" + editorServicesLogPath + "' " +
                 "-SessionDetailsPath '" + utils.getSessionFilePath() + "' ";
 
             var powerShellArgs = [

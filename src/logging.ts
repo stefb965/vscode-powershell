@@ -15,42 +15,39 @@ export enum LogLevel {
     Error
 }
 
-// TODO:
-// - Instead of creating log files with the timestamp, create a single
-//   timestamped folder with plain log file names inside!
-// - Add an "Open Extension Logs Folder" command to open the log folder for this session!
-// - Use the new debug parameter approach to pass the current session
-//   and log file path information to the debug adapter.
-
 export class Logger {
 
-    private showLogsCommand: vscode.Disposable;
+    private commands: vscode.Disposable[];
     private logChannel: vscode.OutputChannel;
     private logFilePath: string;
+
+    public logBasePath: string;
 
     constructor(readonly MinimumLogLevel: LogLevel = LogLevel.Normal) {
         this.logChannel = vscode.window.createOutputChannel("PowerShell Extension Logs");
 
-        var logBasePath = Logger.getLogBasePath();
-        utils.ensurePathExists(logBasePath);
-
-        this.logFilePath =
+        this.logBasePath =
             path.resolve(
-                logBasePath,
-                Logger.getLogName("PowerShell"));
+                __dirname,
+                "../logs",
+                `${Math.floor(Date.now() / 1000)}-${vscode.env.sessionId}`);
+        this.logFilePath = this.getLogFilePath("vscode-powershell");
 
-        this.showLogsCommand =
+        utils.ensurePathExists(this.logBasePath);
+
+        this.commands = [
             vscode.commands.registerCommand(
                 'PowerShell.ShowLogs',
-                () => { this.showLogPanel(); })
+                () => { this.showLogPanel(); }),
+
+            vscode.commands.registerCommand(
+                'PowerShell.OpenLogFolder',
+                () => { this.openLogFolder(); })
+        ]
     }
 
-    public static getLogName(baseName: string): string {
-        return Math.floor(Date.now() / 1000) + '-' +  baseName + '.log';
-    }
-
-    public static getLogBasePath(): string {
-        return path.resolve(__dirname, "../logs");
+    public getLogFilePath(baseName: string): string {
+        return path.resolve(this.logBasePath, `${baseName}.log`);
     }
 
     public writeAtLevel(logLevel: LogLevel, message: string, ...additionalMessages: string[]) {
@@ -103,12 +100,21 @@ export class Logger {
     }
 
     public dispose() {
-        this.showLogsCommand.dispose();
+        this.commands.forEach((command) => { command.dispose() });
         this.logChannel.dispose();
     }
 
     private showLogPanel() {
         this.logChannel.show();
+    }
+
+    private openLogFolder() {
+        // Open the folder in VS Code since there isn't an easy way to
+        // open the folder in the platform's file browser
+        vscode.commands.executeCommand(
+            'vscode.openFolder',
+            vscode.Uri.file(this.logBasePath),
+            true);
     }
 }
 
