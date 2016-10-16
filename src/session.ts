@@ -9,22 +9,32 @@ import path = require('path');
 import utils = require('./utils');
 import vscode = require('vscode');
 import cp = require('child_process');
-import logging = require('./logging');
 import settingsManager = require('./settings');
 
+import { Logger } from './logging';
 import { IFeature } from './feature';
 import { LanguageClient, LanguageClientOptions, Executable, RequestType, NotificationType, StreamInfo } from 'vscode-languageclient';
 
+export enum SessionStatus
+{
+    Initializing,
+    Running,
+    Failed
+}
+
 export class SessionManager {
 
+    private ShowStatusBarMenuCommandName = "PowerShell.ShowStatusMenu";
+
     private hostVersion: string;
+    private statusBarItem: vscode.StatusBarItem;
+    private consoleTerminal: vscode.Terminal = undefined;
     private registeredCommands: vscode.Disposable[] = [];
     private languageServerClient: LanguageClient = undefined;
-    private powerShellLogWriter: fs.WriteStream = undefined;
-    private consoleTerminal: vscode.Terminal = undefined;
 
     constructor(
-        public requiredEditorServicesVersion: string,
+        private requiredEditorServicesVersion: string,
+        private log: Logger,
         private extensionFeatures: IFeature[] = []) {
 
         // Get the current version of this extension
@@ -36,6 +46,7 @@ export class SessionManager {
                 .version;
 
         this.registerCommands();
+        this.createStatusBarItem();
     }
 
     public start() {
@@ -89,7 +100,7 @@ export class SessionManager {
                         });
 
                     // Don't continue initializing since Editor Services will not load successfully
-                    console.log("Cannot start PowerShell Editor Services due to missing OpenSSL dependency.");
+                    this.setSessionFailure("Cannot start PowerShell Editor Services due to missing OpenSSL dependency.");
                     return;
                 }
         }
@@ -108,7 +119,7 @@ export class SessionManager {
                 powerShellExePath, fs.X_OK,
                 (err) => {
                     if (err) {
-                        vscode.window.showErrorMessage(
+                        this.setSessionFailure(
                             "powershell.exe cannot be found or is not accessible at path " + powerShellExePath);
                     }
                     else {
@@ -129,10 +140,10 @@ export class SessionManager {
 
     public stop() {
         // Shut down existing session if there is one
-        this.powerShellLogWriter.write("\r\n\r\nShutting down language client...");
+        this.log.write("\r\n\r\nShutting down language client...");
 
         // Close the language server client
-        if (this.languageServerClient) {
+        if (this.languageServerClient !== undefined) {
             this.languageServerClient.stop();
             this.languageServerClient = undefined;
         }
@@ -141,8 +152,11 @@ export class SessionManager {
         utils.deleteSessionFile();
 
         // Kill the PowerShell process we spawned via the console
-        this.powerShellLogWriter.write("\r\nTerminating PowerShell process...");
-        this.consoleTerminal.dispose();
+        if (this.consoleTerminal !== undefined) {
+            this.log.write("\r\nTerminating PowerShell process...");
+            this.consoleTerminal.dispose();
+            this.consoleTerminal = undefined;
+        }
     }
 
     public dispose() : void {
@@ -156,7 +170,8 @@ export class SessionManager {
     private registerCommands() : void {
         this.registeredCommands = [
             vscode.commands.registerCommand('PowerShell.RunSelection', () => { this.runSelectionInConsole(); }),
-            vscode.commands.registerCommand('PowerShell.RestartSession', () => { this.restartSession(); })
+            vscode.commands.registerCommand('PowerShell.RestartSession', () => { this.restartSession(); }),
+            vscode.commands.registerCommand(this.ShowStatusBarMenuCommandName, () => { this.showStatusMenu(); })
         ]
     }
 
@@ -186,19 +201,19 @@ export class SessionManager {
     private startPowerShell(powerShellExePath: string, bundledModulesPath: string, startArgs: string) {
         try
         {
+            this.setSessionStatus(
+                "Starting PowerShell...",
+                SessionStatus.Initializing);
+
             let startScriptPath =
                 path.resolve(
                     __dirname,
                     '../scripts/Start-EditorServices.ps1');
 
-            var logBasePath = path.resolve(__dirname, "../logs");
-            utils.ensurePathExists(logBasePath);
-
-            var editorServicesLogName = logging.getLogName("EditorServices");
-            var powerShellLogName = logging.getLogName("PowerShell");
+            var editorServicesLogName = Logger.getLogName("EditorServices");
 
             startArgs +=
-                "-LogPath '" + path.resolve(logBasePath, editorServicesLogName) + "' " +
+                "-LogPath '" + path.resolve(Logger.getLogBasePath(), editorServicesLogName) + "' " +
                 "-SessionDetailsPath '" + utils.getSessionFilePath() + "' ";
 
             var powerShellArgs = [
@@ -227,35 +242,37 @@ export class SessionManager {
 
             this.consoleTerminal.show();
 
-            // Open a log file to be used for PowerShell.exe output
-            this.powerShellLogWriter =
-                fs.createWriteStream(
-                    path.resolve(logBasePath, powerShellLogName))
+            // Once the process has started, log the details
+            this.consoleTerminal.processId.then((pid) => {
+                this.log.write(
+                    "powershell.exe started",
+                    "    pid: " + pid,
+                    "    exe: " + powerShellExePath,
+                    "    bundledModulesPath: " + bundledModulesPath,
+                    "    args: " + startScriptPath + ' ' + startArgs + "\r\n");
+            })
 
             // Start the language client
             utils.waitForSessionFile(
                 (sessionDetails, error) => {
                     if (sessionDetails) {
                         // Start the language service client
-                        this.startLanguageClient(sessionDetails.languageServicePort, this.powerShellLogWriter);
+                        this.startLanguageClient(sessionDetails.languageServicePort);
                     }
                     else {
-                        vscode.window.showErrorMessage("Could not start language server: " + error);
+                        this.setSessionFailure("Could not start language server", error);
                     }
                 });
-
-            // TODO: Set timeout for response from powershell.exe
         }
         catch (e)
         {
-            vscode.window.showErrorMessage(
-                "The language service could not be started: " + e);
+            this.setSessionFailure("The language service could not be started: ", e);
         }
     }
 
-    private startLanguageClient(port: number, logWriter: fs.WriteStream) {
+    private startLanguageClient(port: number) {
 
-        logWriter.write("Connecting to port: " + port + "\r\n");
+        this.log.write("Connecting to language service on port " + port + "...\r\n");
 
         try
         {
@@ -265,8 +282,8 @@ export class SessionManager {
                         var socket = net.connect(port);
                         socket.on(
                             'connect',
-                            function() {
-                                console.log("Socket connected!");
+                            () => {
+                                this.log.write("Language service connected.");
                                 resolve({writer: socket, reader: socket})
                             });
                     });
@@ -287,15 +304,22 @@ export class SessionManager {
                     clientOptions);
 
             this.languageServerClient.onReady().then(
-                () => this.updateExtensionFeatures(this.languageServerClient),
-                (reason) => vscode.window.showErrorMessage("Could not start language service: " + reason));
+                () => {
+                    this.setSessionStatus(
+                        "Running",
+                        SessionStatus.Running);
+
+                    this.updateExtensionFeatures(this.languageServerClient)
+                },
+                (reason) => {
+                    this.setSessionFailure("Could not start language service: ", reason);
+                });
 
             this.languageServerClient.start();
         }
         catch (e)
         {
-            vscode.window.showErrorMessage(
-                "The language service could not be started: " + e);
+            this.setSessionFailure("The language service could not be started: ", e);
         }
     }
 
@@ -308,5 +332,52 @@ export class SessionManager {
     private restartSession() {
         this.stop();
         this.start();
+    }
+
+    private createStatusBarItem() {
+        if (this.statusBarItem == undefined) {
+            // Create the status bar item and place it right next
+            // to the language indicator
+            this.statusBarItem =
+                vscode.window.createStatusBarItem(
+                    vscode.StatusBarAlignment.Right,
+                    1);
+
+            this.statusBarItem.command = this.ShowStatusBarMenuCommandName;
+            this.statusBarItem.show();
+        }
+    }
+
+    private setSessionStatus(statusText: string, status: SessionStatus): void {
+        // Set color and icon for 'Running' by default
+        var statusIconText = "$(terminal) ";
+        var statusColor = "#affc74";
+
+        if (status == SessionStatus.Initializing) {
+            statusIconText = "$(sync) ";
+            statusColor = "#f3fc74";
+        }
+        else if (status == SessionStatus.Failed) {
+            statusIconText = "$(alert) ";
+            statusColor = "#fcc174";
+        }
+
+        this.statusBarItem.color = statusColor;
+        this.statusBarItem.text = statusIconText + statusText;
+    }
+
+    private setSessionFailure(message: string, ...additionalMessages: string[]) {
+        this.log.writeAndShowError(message, ...additionalMessages);
+
+        this.setSessionStatus(
+            "Initialization Error",
+            SessionStatus.Failed);
+    }
+
+    private showStatusMenu() {
+        // TODO: Generate the menu based on context
+        vscode.window.showQuickPick(
+            [ "Restart Current Session",
+              "Switch to PowerShell (x86)" ]);
     }
 }

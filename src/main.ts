@@ -6,6 +6,7 @@
 
 import vscode = require('vscode');
 
+import { Logger, LogLevel } from './logging';
 import { IFeature } from './feature';
 import { SessionManager } from './session';
 import { PowerShellLanguageId } from './utils';
@@ -19,6 +20,7 @@ import { ExtensionCommandsFeature } from './features/ExtensionCommands';
 //       PS Editor Services version...
 var requiredEditorServicesVersion = "0.7.9";
 
+var logger: Logger = undefined;
 var sessionManager: SessionManager = undefined;
 var extensionFeatures: IFeature[] = [];
 
@@ -62,6 +64,10 @@ export function activate(context: vscode.ExtensionContext): void {
             }
         });
 
+    // Create the logger
+    // TODO: Pull level from settings
+    logger = new Logger(LogLevel.Verbose);
+
     // Create features
     extensionFeatures = [
         new OpenInISEFeature(),
@@ -71,11 +77,19 @@ export function activate(context: vscode.ExtensionContext): void {
         new ExtensionCommandsFeature()
     ];
 
-    sessionManager = new SessionManager(requiredEditorServicesVersion, extensionFeatures);
+    sessionManager =
+        new SessionManager(
+            requiredEditorServicesVersion,
+            logger,
+            extensionFeatures);
+
     sessionManager.start();
 }
 
 export function deactivate(): void {
+    // Finish the logger
+    logger.dispose();
+
     // Clean up all extension features
     extensionFeatures.forEach(feature => {
        feature.dispose();

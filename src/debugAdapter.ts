@@ -1,8 +1,12 @@
+/*---------------------------------------------------------
+ * Copyright (C) Microsoft Corporation. All rights reserved.
+ *--------------------------------------------------------*/
+
 import fs = require('fs');
 import path = require('path');
 import net = require('net');
 import utils = require('./utils');
-import logging = require('./logging');
+import { Logger } from './logging';
 
 // NOTE: The purpose of this file is to serve as a bridge between
 // VS Code's debug adapter client (which communicates via stdio) and
@@ -17,7 +21,7 @@ var debugAdapterLogWriter =
     fs.createWriteStream(
         path.resolve(
             logBasePath,
-            logging.getLogName("DebugAdapterClient")));
+            Logger.getLogName("DebugAdapterClient")));
 
 // Pause the stdin buffer until we're connected to the
 // debug server

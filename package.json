@@ -94,6 +94,11 @@
                 "category": "PowerShell"
             },
             {
+                "command": "PowerShell.ShowLogs",
+                "title": "Show PowerShell Extension Logs",
+                "category": "PowerShell"
+            },
+            {
                 "command": "PowerShell.OpenInISE",
                 "title": "Open current file in PowerShell ISE",
                 "category": "PowerShell"

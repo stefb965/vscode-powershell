@@ -125,16 +125,6 @@ function onInputEntered(responseText: string): ShowInputPromptResponseBody {
 
 export function registerConsoleCommands(terminal: vscode.Terminal, client: LanguageClient): void {
 
-    // var consoleChannel = vscode.window.createOutputChannel("PowerShell Output");
-    // client.onNotification(OutputNotification.type, (output) => {
-    //     var outputEditorExist = vscode.window.visibleTextEditors.some((editor) => {
-	//            return editor.document.languageId == 'Log'
-    //     });
-    //     if (!outputEditorExist)
-    //         consoleChannel.show(vscode.ViewColumn.Three);
-    //     consoleChannel.append(output.output);
-    // });
-
     client.onRequest(
         ShowChoicePromptRequest.type,
         promptDetails => showChoicePrompt(promptDetails, client));
