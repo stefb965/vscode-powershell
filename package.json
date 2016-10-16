@@ -133,7 +133,13 @@
                         "powershell"
                     ]
                 },
+				"variables": {
+					"GetSessionPath": "PowerShell.GetSessionPath"
+				},
                 "program": "./out/debugAdapter.js",
+                "args": [
+                    "${command.GetSessionPath}"
+                ],
                 "runtime": "node",
                 "configurationAttributes": {
                     "launch": {
@@ -152,6 +158,11 @@
                                     "type": "string"
                                 },
                                 "default": []
+                            },
+                            "debugAdapterArgs": {
+                                "type": "string",
+                                "description": "Arguments that are sent by the extension to the debug adapter.  Not a user setting.",
+                                "default": "${command.GetSessionPath}"
                             },
                             "cwd": {
                                 "type": "string",

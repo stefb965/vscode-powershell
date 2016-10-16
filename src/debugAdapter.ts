@@ -22,6 +22,8 @@ var debugAdapterLogWriter =
             logBasePath,
             "DebugAdapter.log"));
 
+debugAdapterLogWriter.write("Args: " + process.argv + "\r\n");
+
 // Pause the stdin buffer until we're connected to the
 // debug server
 process.stdin.pause();

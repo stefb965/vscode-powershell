@@ -171,7 +171,9 @@ export class SessionManager {
         this.registeredCommands = [
             vscode.commands.registerCommand('PowerShell.RunSelection', () => { this.runSelectionInConsole(); }),
             vscode.commands.registerCommand('PowerShell.RestartSession', () => { this.restartSession(); }),
-            vscode.commands.registerCommand(this.ShowStatusBarMenuCommandName, () => { this.showStatusMenu(); })
+            vscode.commands.registerCommand(this.ShowStatusBarMenuCommandName, () => { this.showStatusMenu(); }),
+            vscode.commands.registerCommand('PowerShell.GetSessionPath', () => {
+                return this.getDebugAdapterArgs() })
         ]
     }
 
@@ -379,5 +381,9 @@ export class SessionManager {
         vscode.window.showQuickPick(
             [ "Restart Current Session",
               "Switch to PowerShell (x86)" ]);
+    }
+
+    private getDebugAdapterArgs() {
+        return "TEST!";
     }
 }
