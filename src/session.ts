@@ -259,6 +259,9 @@ export class SessionManager {
             utils.waitForSessionFile(
                 (sessionDetails, error) => {
                     if (sessionDetails) {
+                        // Store the debug server port
+                        this.updateLaunchConfiguration(sessionDetails.debugServicePort);
+
                         // Start the language service client
                         this.startLanguageClient(sessionDetails.languageServicePort);
                     }
@@ -271,6 +274,13 @@ export class SessionManager {
         {
             this.setSessionFailure("The language service could not be started: ", e);
         }
+    }
+
+    private updateLaunchConfiguration(port: number) {
+        var config = vscode.workspace.getConfiguration('launch');
+        config.update('debugServer', port);
+
+        // Make sure other settings are there
     }
 
     private startLanguageClient(port: number) {
