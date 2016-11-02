@@ -116,7 +116,7 @@ export class SessionManager {
 
             // If the path does not exist, show an error
             fs.access(
-                powerShellExePath, fs.X_OK,
+                powerShellExePath, fs.constants.X_OK,
                 (err) => {
                     if (err) {
                         this.setSessionFailure(

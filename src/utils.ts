@@ -123,7 +123,7 @@ export function deleteSessionFile() {
 
 export function checkIfFileExists(filePath: string): boolean {
     try {
-        fs.accessSync(filePath, fs.R_OK)
+        fs.accessSync(filePath, fs.constants.R_OK)
         return true;
     }
     catch (e) {
