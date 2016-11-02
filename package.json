@@ -180,7 +180,8 @@
                         "request": "launch",
                         "program": "${file}",
                         "args": [],
-                        "cwd": "${file}"
+                        "cwd": "${file}",
+                        "internalConsoleOptions": "neverOpen"
                     }
                 ]
             }
