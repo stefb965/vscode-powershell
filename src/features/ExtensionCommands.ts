@@ -152,6 +152,16 @@ export interface StatusBarMessageDetails {
     timeout?: number;
 }
 
+
+// Request for known documents
+export namespace KnownDocumentsRequest {
+    export const type: RequestType<any, KnownDocumentsRequestResult, void> = { get method(): string { return "powerShell/getKnownDocuments"; }};
+}
+
+export interface KnownDocumentsRequestResult {
+    documents: string[];
+}
+
 export class ExtensionCommandsFeature implements IFeature {
 
     private command: vscode.Disposable;
@@ -222,6 +232,12 @@ export class ExtensionCommandsFeature implements IFeature {
             this.languageClient.onRequest(
                 SetStatusBarMessageRequest.type,
                 messageDetails => this.setStatusBarMessage(messageDetails));
+
+            this.languageClient.onRequest(KnownDocumentsRequest.type, someObject => {
+                return {
+                    documents: vscode.workspace.textDocuments.map(textDocument => textDocument.uri.toString())
+                };
+            });
         }
     }
 
